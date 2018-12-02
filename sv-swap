@@ -19,6 +19,32 @@ prop = 'fill'
 backup = None
 overwrite = False
 
+acceptable = [
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'a',
+    'b',
+    'c',
+    'd',
+    'e',
+    'f',
+    '#'
+]
+
 
 def validhexcolors(code):
     # check hex code validity
@@ -26,25 +52,6 @@ def validhexcolors(code):
 
     if length != 7 and length != 4 and length != 9:
         return False
-
-    acceptable = [
-        '0',
-        '2',
-        '3',
-        '4',
-        '5',
-        '6',
-        '7',
-        '8',
-        '9',
-        'A',
-        'B',
-        'C',
-        'D',
-        'E',
-        'F',
-        '#'
-    ]
 
     for c in code:
         if c not in acceptable:
@@ -95,6 +102,7 @@ def parseargs():
     global prop
     global backup
     global overwrite
+    global acceptable
 
     opts = 'Rvfd:c:t:p:b'
     optlist, args = getopt.getopt(sys.argv[1:], opts)
@@ -223,16 +231,23 @@ def fix(fp):
                 end = None
                 try:
                     start = l.index(prop + ':') + len(prop) + 1
-                    end = l.index(';', start)
+                    hlen = 0
+                    for c in l[start:]:
+                        if c in acceptable or (hlen < 1 and c == ' '):
+                            hlen += 1
+                        else:
+                            end = start + hlen
+                            break
                 except:
                     pass
                 finally:
-                    if start != None:
+                    if start != None and end != None:
+                        print(l)
                         newl = l.replace(
                             l[start:end],
                             color
                         ).replace('\n', '')
-
+                        print('new', newl)
                         out.append(newl)
 
                         if verbose:
