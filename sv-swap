@@ -242,12 +242,10 @@ def fix(fp):
                     pass
                 finally:
                     if start != None and end != None:
-                        print(l)
                         newl = l.replace(
                             l[start:end],
                             color
                         ).replace('\n', '')
-                        print('new', newl)
                         out.append(newl)
 
                         if verbose:
