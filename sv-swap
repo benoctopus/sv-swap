@@ -220,6 +220,7 @@ def fix(fp):
 
             for l in linecopy:
                 start = None
+                end = None
                 try:
                     start = l.index(prop + ':') + len(prop) + 1
                     end = l.index(';', start)
