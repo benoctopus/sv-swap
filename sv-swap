@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+
+import fileinput
+import sys
+import os
+import getopt
+from shutil import copyfile
+
+recursive = False
+colors = []
+outputdir = os.getcwd()
+outputdirs = []
+singleout = True
+postfixs = []
+files = []
+operations = 0
+verbose = False
+prop = 'fill'
+backup = None
+overwrite = False
+
+
+def validhexcolors(code):
+    # check hex code validity
+    length = len(code)
+
+    if length != 7 and length != 4 and length != 9:
+        return False
+
+    acceptable = [
+        '0',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+        'A',
+        'B',
+        'C',
+        'D',
+        'E',
+        'F',
+        '#'
+    ]
+
+    for c in code:
+        if c not in acceptable:
+            return False
+
+    return True
+
+
+def prepareoutput(v):
+    # check and prepare output directory
+    loutputdir = os.path.abspath(v)
+
+    if loutputdir[-1] != '/':
+        loutputdir = loutputdir + '/'
+
+    if not os.path.exists(loutputdir):
+        try:
+            os.makedirs(os.path.normpath(
+                os.path.join(os.getcwd(), loutputdir)))
+        except:
+            print(
+                'Could not create destination directory.',
+                loutputdir.split('/')[-1]
+            )
+            sys.exit(1)
+    elif not os.path.isdir(loutputdir):
+        print(
+            'cannot use output dir',
+            loutputdir,
+            'because it is a file, aborting.'
+        )
+        sys.exit(1)
+
+    return loutputdir
+
+
+def parseargs():
+    # parse cmd options and arguments
+
+    global recursive
+    global colors
+    global outputdir
+    global outputdirs
+    global singleout
+    global postfixs
+    global files
+    global verbose
+    global prop
+    global backup
+    global overwrite
+
+    opts = 'Rvfd:c:t:p:b'
+    optlist, args = getopt.getopt(sys.argv[1:], opts)
+    output = False
+
+    if len(args) < 1:
+        print('No target supplied')
+        sys.exit(1)
+
+    for f in args:
+        if not os.path.exists(f):
+            print(f, 'doesnt exist, aborting.')
+            sys.exit(1)
+
+    for o, v in optlist:
+        if o == '-c':
+            colors = v.split(' ')
+
+            for color in colors:
+                if not validhexcolors(color):
+                    print('Invalid hex color:', color)
+                    sys.exit(1)
+
+        elif o == '-d':
+
+            if (' ' in v):
+                # will not work with paths that include spaces :(
+                outputdirs = list(map(prepareoutput, v.split(' ')))
+                print(outputdirs)
+                singleout = False
+            else:
+                outputdir = prepareoutput(v)
+                singleout = True
+
+            output = True
+
+        elif o == '-b':
+            if len(v) < 1:
+                backup = 'same'
+            else:
+                backup = os.path.normpath(os.path.join(os.getcwd(), v))
+
+                if not os.path.exists(backup):
+                    os.makedirs(backup)
+                elif not os.path.isdir(backup):
+                    print(
+                        'backup path',
+                        backup.split('/')[-1],
+                        'points to a file, aborting.'
+                    )
+                    sys.exit(1)
+
+        elif o == '-t':
+            if ' ' in v:
+                postfixs = v.split(' ')
+            else:
+                postfixs = [v]
+
+        elif o == '-p':
+            prop = v
+
+        elif o == '-R':
+            recursive = True
+
+        elif o == '-v':
+            verbose = True
+
+        elif o == '-f':
+            overwrite = True
+
+    if len(colors) < 1:
+        print('Replacement hex colors must be specified with -c')
+        sys.exit(1)
+
+    files = list(map(lambda a: os.path.abspath(a), args))
+
+
+def fix(fp):
+    # read file, replace properties, either overwrite or write new file
+    if backup != None:
+        bpath = None
+
+        if backup == 'same':
+            bpath = fp + '.bak'
+        else:
+            bpath = backup + fp.split('/')[0] + '.bak'
+
+        copyfile(fp, bpath)
+
+    with open(fp, "r") as file:
+        if verbose:
+            print('Reading file: ', fp)
+
+        lines = file.readlines()
+
+        for i in range(0, len(colors), 1):
+            color = colors[i]
+            outdir = outputdir if singleout else outputdirs[i]
+            postfix = ('-' + postfixs[i]) if len(postfixs) > 0 else ''
+            outpath = None
+
+            if (outdir != None):
+                outpath = outdir + \
+                    fp.split('/')[-1].split('.')[0] + \
+                    postfix + '.svg'
+            else:
+                outpath = fp
+
+            if os.path.exists(outpath):
+                if not overwrite:
+                    print(
+                        'File at',
+                        outpath,
+                        'already exists',
+                        'use with -f to overwrite'
+                    )
+                    sys.exit(1)
+
+                os.remove(outpath)
+
+            out = list()
+            linecopy = lines.copy()
+
+            for l in linecopy:
+                start = None
+                try:
+                    start = l.index(prop + ':') + len(prop) + 1
+                    end = l.index(';', start)
+                except:
+                    pass
+                finally:
+                    if start != None:
+                        newl = l.replace(
+                            l[start:end],
+                            color
+                        ).replace('\n', '')
+
+                        out.append(newl)
+
+                        if verbose:
+                            print('\nLine changed:', newl)
+                    else:
+                        out.append(l)
+
+            with open(outpath, 'w+') as outfile:
+                if verbose:
+                    print('Writing file:', outpath)
+
+                outfile.write(''.join(out))
+                outfile.close()
+
+        file.close()
+
+
+def handlefile(fp):
+    if fp.split('.')[-1] == 'svg':
+        if verbose:
+            print('Current file:', fp)
+
+        fix(fp)
+    else:
+        if verbose:
+            print(fp.split('/')[-1], 'is not an svg, skipping.')
+
+
+def handledir(fp):
+    if verbose:
+        print('Scanning directory:', fp)
+    for p in os.listdir(fp):
+        ap = os.path.normpath(os.path.join(fp, p))
+
+        if os.path.isdir(ap):
+            if recursive:
+                handledir(ap)
+        else:
+            handlefile(ap)
+
+
+if __name__ == '__main__':
+    parseargs()
+
+    if verbose:
+        print('\n')
+
+    for fp in files:
+        if (os.path.isdir(fp)):
+            handledir(fp)
+        else:
+            handlefile(fp)
+
+    if verbose:
+        print('\n')
