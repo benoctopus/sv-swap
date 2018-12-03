@@ -77,6 +77,7 @@ def prepareoutput(v):
                 loutputdir.split('/')[-1]
             )
             sys.exit(1)
+
     elif not os.path.isdir(loutputdir):
         print(
             'cannot use output dir',
@@ -206,8 +207,8 @@ def fix(fp):
 
             if (outdir != None):
                 outpath = outdir + \
-                    fp.split('/')[-1].split('.')[0] + \
-                    postfix + '.svg'
+                    fp.split('/')[-1].split('.')[0].strip() + \
+                    postfix.strip() + '.svg'
             else:
                 outpath = fp
 
